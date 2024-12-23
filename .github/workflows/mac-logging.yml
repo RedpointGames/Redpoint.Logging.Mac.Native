@@ -36,24 +36,30 @@ jobs:
         if ($LastExitCode -ne 0) { exit $LastExitCode }
 
         Push-Location "Redpoint.Logging.Mac.Native"
+        try {
+          Write-Host "Building native logging libraries for macOS..."
+          New-Item -ItemType Directory -Path ./runtimes/osx-arm64/native/ | Out-Null
+          clang -dynamiclib -o "./runtimes/osx-arm64/native/libLogging.arm64.dylib" -arch arm64 "logging.c"
+          if ($LastExitCode -ne 0) { exit $LastExitCode }
+          New-Item -ItemType Directory -Path ./runtimes/osx-x64/native/ | Out-Null
+          clang -dynamiclib -o "./runtimes/osx-x64/native/libLogging.x64.dylib" -arch x86_64 "logging.c"
+          if ($LastExitCode -ne 0) { exit $LastExitCode }
 
-        Write-Host "Building native logging libraries for macOS..."
-        New-Item -ItemType Directory -Path ./runtimes/osx-arm64/native/ | Out-Null
-        clang -dynamiclib -o "./runtimes/osx-arm64/native/libLogging.arm64.dylib" -arch arm64 "logging.c"
-        if ($LastExitCode -ne 0) { exit $LastExitCode }
-        New-Item -ItemType Directory -Path ./runtimes/osx-x64/native/ | Out-Null
-        clang -dynamiclib -o "./runtimes/osx-x64/native/libLogging.x64.dylib" -arch x86_64 "logging.c"
-        if ($LastExitCode -ne 0) { exit $LastExitCode }
+          Write-Host "Generating NuGet package..."
+          Invoke-WebRequest -UseBasicParsing -OutFile nuget.exe -Uri "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe"
+          /opt/homebrew/bin/mono nuget.exe pack Redpoint.Logging.Mac.Native.nuspec -Version $PackageVersion -OutputDirectory bin
+          if ($LastExitCode -ne 0) { exit $LastExitCode }
+        } finally {
+          Pop-Location
+        }
 
-        Write-Host "Generating NuGet package..."
-        Invoke-WebRequest -UseBasicParsing -OutFile nuget.exe -Uri "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe"
-        /opt/homebrew/bin/mono nuget.exe pack Redpoint.Logging.Mac.Native.nuspec -Version $PackageVersion -OutputDirectory bin
-        if ($LastExitCode -ne 0) { exit $LastExitCode }
+        Write-Host "Full paths for generated NuGet packages:"
+        (Get-ChildItem -Path "Redpoint.Logging.Mac.Native/bin/" -Filter "Redpoint.Logging.Mac.Native.*.nupkg" | % { $_.FullName })
     - name: Publish Redpoint.Logging.Mac.Native
       shell: pwsh
       if: github.ref == 'refs/heads/main'
       env:
         NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
       run: |
-        dotnet nuget push --source https://api.nuget.org/v3/index.json --api-key $env:NUGET_API_KEY (Get-ChildItem -Recurse -Filter "bin/Redpoint.Logging.Mac.Native.*.nupkg" | % { $_.FullName })
+        dotnet nuget push --source https://api.nuget.org/v3/index.json --api-key $env:NUGET_API_KEY (Get-ChildItem -Path "Redpoint.Logging.Mac.Native/bin/" -Filter "Redpoint.Logging.Mac.Native.*.nupkg" | % { $_.FullName })
         if ($LastExitCode -ne 0) { exit $LastExitCode }

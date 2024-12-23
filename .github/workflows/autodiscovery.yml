@@ -58,7 +58,7 @@ jobs:
       env:
         NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
       run: |
-        dotnet nuget push --source https://api.nuget.org/v3/index.json --api-key $env:NUGET_API_KEY (Get-ChildItem -Recurse -Filter "Redpoint.AutoDiscovery.Win32/bin/Release/Redpoint.AutoDiscovery.Win32.*.nupkg" | % { $_.FullName })
+        dotnet nuget push --source https://api.nuget.org/v3/index.json --api-key $env:NUGET_API_KEY (Get-ChildItem -Recurse -Filter "Redpoint.AutoDiscovery.Win32/bin/x86/Release/Redpoint.AutoDiscovery.Win32.*.nupkg" | % { $_.FullName })
         if ($LastExitCode -ne 0) { exit $LastExitCode }
-        dotnet nuget push --source https://api.nuget.org/v3/index.json --api-key $env:NUGET_API_KEY (Get-ChildItem -Recurse -Filter "Redpoint.AutoDiscovery.Win64/bin/Release/Redpoint.AutoDiscovery.Win64.*.nupkg" | % { $_.FullName })
+        dotnet nuget push --source https://api.nuget.org/v3/index.json --api-key $env:NUGET_API_KEY (Get-ChildItem -Recurse -Filter "Redpoint.AutoDiscovery.Win64/bin/x64/Release/Redpoint.AutoDiscovery.Win64.*.nupkg" | % { $_.FullName })
         if ($LastExitCode -ne 0) { exit $LastExitCode }
