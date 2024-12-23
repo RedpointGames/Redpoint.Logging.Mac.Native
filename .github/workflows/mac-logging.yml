@@ -1,0 +1,57 @@
+name: Redpoint.Logging.Mac.Native
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  UET_FRAMEWORK_TARGET: net8.0
+  UET_BUILDING_ON_BUILD_SERVER: "true"
+
+jobs:
+  mac-logging:
+    name: "Build and Publish Redpoint.Logging.Mac.Native"
+    runs-on: macos-latest
+    needs:
+      - timestamp
+    env:
+      UET_PACKAGE_VERSION: ${{ needs.timestamp.outputs.version }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Install .NET SDK
+      uses: ./.github/actions/dotnet-sdk
+      with:
+        UET_FRAMEWORK_TARGET: ${{ env.UET_FRAMEWORK_TARGET }}
+    - name: Build Redpoint.Logging.Mac.Native
+      shell: pwsh
+      run: |
+        $Timestamp = ([DateTime]::UtcNow)
+        $PackageVersion = "$($Timestamp.Year).$($Timestamp.DayOfYear + 1000).$(($Timestamp.Hour * 60) + $Timestamp.Minute)"
+        Set-Content -NoNewline -Path "package.version" -Value "$($PackageVersion)"
+        Set-Content -NoNewline -Path "$env:GITHUB_OUTPUT" -Value "version=$($PackageVersion)"
+
+        Write-Host "Package version: $PackageVersion"
+
+        Write-Host "Building native logging libraries for macOS..."
+        clang -dynamiclib -o "Redpoint.Logging.Mac.Native/runtimes/osx-arm64/libLogging.arm64.dylib" -arch arm64 "Redpoint.Logging.Mac.Native/logging.c"
+        if ($LastExitCode -ne 0) { exit $LastExitCode }
+        clang -dynamiclib -o "Redpoint.Logging.Mac.Native/runtimes/osx-x64/libLogging.x64.dylib" -arch x86_64 "Redpoint.Logging.Mac.Native/logging.c"
+        if ($LastExitCode -ne 0) { exit $LastExitCode }
+
+        Write-Host "Generating NuGet package..."
+        Invoke-WebRequest -UseBasicParsing -OutFile nuget.exe -Uri "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe"
+        /opt/homebrew/bin/mono nuget.exe pack ./Redpoint.Logging.Mac.Native/Redpoint.Logging.Mac.Native.nuspec -Version $PackageVersion -OutputDirectory bin
+        if ($LastExitCode -ne 0) { exit $LastExitCode }
+    - name: Publish Redpoint.Logging.Mac.Native
+      shell: pwsh
+      if: github.ref == 'refs/heads/main'
+      env:
+        NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+      run: |
+        dotnet nuget push --source https://api.nuget.org/v3/index.json --api-key $env:NUGET_API_KEY (Get-ChildItem -Recurse -Filter "bin/Redpoint.Logging.Mac.Native.*.nupkg" | % { $_.FullName })
+        if ($LastExitCode -ne 0) { exit $LastExitCode }
